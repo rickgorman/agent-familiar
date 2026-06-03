@@ -1,8 +1,13 @@
 #!/bin/bash
-# Claude Code hook: speak the session's state as a short musical utterance.
+# Claude Code adapter: speak the session's state as a short creature call.
 # Reads the hook JSON on stdin, tails the transcript, plays. Fire-and-forget.
+#
+# Configuration (set in the environment, or inline in settings.json):
+#   FAMILIAR_MODE    creature (default) | duet | vocab
+#   FAMILIAR_DIR     where agent-familiar lives (default ~/.claude/agent-familiar)
+#   FAMILIAR_VOLUME  0.0-1.0, default 0.35
 
-FAMILIAR_DIR="$HOME/.claude/agent-familiar"
+FAMILIAR_DIR="${FAMILIAR_DIR:-$HOME/.claude/agent-familiar}"
 PY=$(command -v python3 || echo /usr/bin/python3)
 
 input=$(cat)
@@ -49,6 +54,7 @@ if [ "$event" = "Notification" ]; then
 fi
 
 printf '%s' "$text" \
-  | $PY "$FAMILIAR_DIR/familiar.py" play --mode creature --session "$session" "${need_args[@]}" \
+  | $PY "$FAMILIAR_DIR/familiar.py" play --mode "${FAMILIAR_MODE:-creature}" \
+      --session "$session" "${need_args[@]}" \
   >/dev/null 2>&1 &
 exit 0
