@@ -4,10 +4,10 @@
 #
 # Configuration (set in the environment, or inline in settings.json):
 #   FAMILIAR_MODE    creature (default) | duet | vocab
-#   FAMILIAR_DIR     where agent-familiar lives (default ~/.claude/agent-familiar)
+#   FAMILIAR_DIR     where agent-familiar lives (default: this script's dir)
 #   FAMILIAR_VOLUME  0.0-1.0, default 0.35
 
-FAMILIAR_DIR="${FAMILIAR_DIR:-$HOME/.claude/agent-familiar}"
+FAMILIAR_DIR="${FAMILIAR_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 PY=$(command -v python3 || echo /usr/bin/python3)
 
 input=$(cat)

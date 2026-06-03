@@ -4,7 +4,6 @@
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-OK=0
 WARN=0
 
 say()  { printf '%s\n' "$*"; }
@@ -81,7 +80,7 @@ else
 fi
 
 # --- smoke test: render without playing ---
-SMOKE=$(mktemp -t familiar-smoke).wav
+SMOKE=$(mktemp -t familiar-smoke)
 if printf '%s' "all tests pass, shipped" \
    | (cd "$HERE" && python3 familiar.py render --mode creature --session install-smoke --out "$SMOKE") >/dev/null 2>&1 \
    && [ -s "$SMOKE" ]; then
