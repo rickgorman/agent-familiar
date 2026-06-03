@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
-"""Session-music black box.
+"""agent-familiar: turn an agent session's recent text into a short audio
+utterance that expresses what the session needs and how it is going.
 
 Pipeline:
-  text (last ~20 lines)  -->  compose()  -->  phrase (note events)
-  phrase                 -->  render()   -->  out.wav  -->  afplay
+  text (last ~1000 chars)  -->  compose()  -->  phrase (sound events)
+  phrase                   -->  render()   -->  stereo wav  -->  play
 
-compose() is deterministic: same text -> same music (session identity).
-A coarse *class* (error / success / question / code / status) picks the
-semantic frame. Two continuous affect dimensions then modulate everything
-*within* that class:
+Analysis (analyze_rich): a local embedding is projected onto affect axes
+(valence, arousal, certainty, progress), a fixed texture bank (locality:
+similar moods sound similar), and the session's own trajectory (movement,
+trend, loop detection, familiarity). A lexicon pass fills in what embeddings
+miss (CAPS, !!!, hedges) and serves as the fallback when no embedder is up.
 
-  valence   in [-1, 1]  negative..positive  -> scale brightness, instrument,
-                                               cadence resolution, chord color
-  intensity in [0, 1]   calm..intense       -> duration (inverse), density,
-                                               register, articulation, dynamics
+Modes:
+  vocab     musical motifs on synth pads -- needs as melodic words
+  creature  organic animal calls (default in hook.sh)
+  duet      two creatures with dominance dynamics
+  pad/full  earlier pad and genre-groove experiments
 
-Both come from a bag-of-words pass over the buffer (v1). render() mixes
-pre-rendered bank notes in pure stdlib so the hot path stays fast.
+Synthesis happens through sox patches (synth.py); voices are cached and
+mixed in pure-stdlib Python, so the hot path is ~250ms warm.
 """
 
 import argparse
@@ -27,6 +30,7 @@ import math
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1475,12 +1479,44 @@ def write_wav(samples, path, channels=2):
 
 PLAY_VOLUME = os.environ.get("FAMILIAR_VOLUME", "0.35")
 
+PLAYERS = (
+    ["afplay"],
+    ["paplay"],
+    ["aplay", "-q"],
+    ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"],
+)
+
+
+def _pick_player():
+    if sys.platform == "darwin":
+        return ["afplay"]
+    for candidate in PLAYERS[1:]:
+        if shutil.which(candidate[0]):
+            return candidate
+    return None
+
+
+def _apply_volume(samples):
+    try:
+        volume = float(PLAY_VOLUME)
+    except ValueError:
+        volume = 1.0
+    if volume == 1.0:
+        return samples
+    for i, value in enumerate(samples):
+        samples[i] = max(-32768, min(32767, int(value * volume)))
+    return samples
+
 
 def play(samples):
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
-    write_wav(samples, tmp.name)
-    subprocess.Popen(["afplay", "-v", PLAY_VOLUME, tmp.name])
+    write_wav(_apply_volume(samples), tmp.name)
+    player = _pick_player()
+    if player is None:
+        print(tmp.name)
+        return tmp.name
+    subprocess.Popen(player + [tmp.name])
     return tmp.name
 
 

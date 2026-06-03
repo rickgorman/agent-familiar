@@ -12,79 +12,68 @@ https://github.com/user-attachments/assets/7fd0afa9-cff4-417f-b995-82db0f226e6e
 
 ## Requirements
 
-- macOS (uses `sox` for synthesis and `afplay` for playback)
+- macOS or Linux
 - Python 3.10+ (stdlib only — no pip installs)
-- [sox](https://sox.sourceforge.net/)
-- [ollama](https://ollama.com) running locally, for embeddings
-- [Claude Code](https://claude.com/claude-code)
+- [sox](https://sox.sourceforge.net/) for synthesis
+- An audio player: `afplay` (built into macOS) or `paplay`/`aplay`/`ffplay` (Linux)
+- [ollama](https://ollama.com) running locally, for embeddings (optional — falls back to a cruder lexicon analysis without it)
+- [Claude Code](https://claude.com/claude-code), for the hook (the CLI works with any text)
 
 ## Installation
 
-### 1. Prerequisites
-
-**Homebrew** (skip if you have it):
-
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
+# prerequisites
+brew install sox ollama            # macOS
+# sudo apt install sox && curl -fsSL https://ollama.com/install.sh | sh   # Debian/Ubuntu
 
-**sox** — the synthesizer:
+brew services start ollama         # macOS (Linux: ollama serve)
+ollama pull all-minilm             # 46MB embedding model
 
-```bash
-brew install sox
-sox --version   # should print SoX vXX.Y.Z
-```
-
-**Python 3.10+** — macOS usually has it; check, and install via brew if missing:
-
-```bash
-python3 --version || brew install python3
-```
-
-**ollama** — local embeddings. Install it, *start it*, then pull the model:
-
-```bash
-brew install ollama
-brew services start ollama          # or just open the Ollama app
-ollama pull all-minilm              # 46MB embedding model
-
-# verify it's serving:
-curl -s localhost:11434/api/tags | grep all-minilm && echo OK
-```
-
-> If ollama isn't running, agent-familiar silently falls back to a cruder
-> lexicon-based analysis — it still makes sounds, they're just less smart.
-
-### 2. Setup
-
-```bash
+# agent-familiar
 git clone https://github.com/rickgorman/agent-familiar ~/work/agent-familiar
-ln -s ~/work/agent-familiar ~/.claude/agent-familiar
+cd ~/work/agent-familiar
+./install.sh
+```
 
-cd ~/.claude/agent-familiar
+`install.sh` verifies every prerequisite, builds the anchor tables, and smoke-tests synthesis. It tells you exactly what's missing and how to get it.
+
+<details>
+<summary>Manual installation (what install.sh does)</summary>
+
+```bash
+sox --version                                    # synthesis
+python3 --version                                # 3.10+
+curl -s localhost:11434/api/tags | grep all-minilm && echo embeddings OK
+
+cd ~/work/agent-familiar
 python3 build_anchors.py   # embeds affect axes + texture bank (~1s, needs ollama up)
 python3 build_bank.py      # optional: note bank for the legacy --engine bank fallback
 ```
 
-### 3. Smoke test
+</details>
+
+### Hear it
 
 ```bash
-echo "all tests pass, shipped to production" \
-  | python3 ~/.claude/agent-familiar/familiar.py play --mode creature
+echo "all tests pass, shipped to production" | python3 familiar.py play --mode creature
 ```
 
-You should hear a happy whoop-chirp within ~300ms. If you hear nothing:
+A happy whoop-chirp within ~300ms. If not:
 
 | symptom | fix |
 |---|---|
 | silence, no error | check output device + volume; try `FAMILIAR_VOLUME=1.0` |
-| `sox: command not found` in stderr | `brew install sox` |
-| `phrase` output shows `"source": "bow"` | ollama not serving — `brew services start ollama` |
-| `FileNotFoundError: anchors.embedded.json` | run `python3 build_anchors.py` |
+| `sox: command not found` | install sox (see above) |
+| silence on Linux | install a player: `pulseaudio-utils`, `alsa-utils`, or `ffmpeg` |
+| `phrase` output shows `"source": "bow"` | ollama not serving — start it, then `./install.sh` again |
 
-### 4. Wire into Claude Code
+### Wire into Claude Code
 
-Merge into the `hooks` section of `~/.claude/settings.json` (create the file with `{"hooks": {...}}` if it doesn't exist; if you already have `Stop`/`Notification` hooks, append to their arrays):
+Symlink so the hook has a stable path, then merge the hook entries into `~/.claude/settings.json` (create the file with `{"hooks": {...}}` if it doesn't exist; if you already have `Stop`/`Notification` hooks, append to their arrays):
+
+```bash
+ln -s ~/work/agent-familiar ~/.claude/agent-familiar
+```
 
 ```json
 "Notification": [
@@ -100,32 +89,6 @@ Merge into the `hooks` section of `~/.claude/settings.json` (create the file wit
 ```
 
 `Stop` infers the call from the transcript tail. `Notification` always plays the blocked-waiting-on-you croak. Hooks are snapshotted at session launch — **restart Claude Code sessions to pick this up**.
-
-## Quick Start
-
-### 1. Hear it
-
-```bash
-echo "all tests pass, shipped to production" | python3 familiar.py play --mode creature
-echo "FATAL segfault, production is down"    | python3 familiar.py play --mode creature
-echo "should I take the locking approach or the queue approach?" | python3 familiar.py play --mode creature
-```
-
-### 2. Inspect what it heard
-
-```bash
-echo "still failing with the same constraint violation" | python3 familiar.py phrase --mode creature
-```
-
-Returns the full analysis: need, valence, arousal, certainty, familiarity, trajectory movement, loop detection, and the composed events.
-
-### 3. Tune
-
-```bash
-FAMILIAR_VOLUME=0.5        # playback volume (default 0.35)
-FAMILIAR_EMBEDDER=hashing  # ollama (default) | http | hashing
-FAMILIAR_HTTP_URL=...      # your own local embedding endpoint
-```
 
 ## The Vocabulary
 
@@ -144,20 +107,85 @@ Inflection carries the rest: pitch wobble = the session is uncertain; body size 
 
 ## Modes
 
-- `--mode creature` — organic animal calls (the default in `hook.sh`)
-- `--mode duet` — two creatures: the session and its adversary, with dominance dynamics (victory, confrontation, retreat, petition, standoff)
-- `--mode vocab` — musical motifs on synth pads, same vocabulary
-- `--mode full` / `--mode pad` — earlier genre-groove and pad experiments, kept for fun
+| mode | sound | when to use |
+|---|---|---|
+| `creature` | one animal: coos, growls, chirps, croaks | the default — ambient and legible |
+| `duet` | two animals: the session vs. its adversary — victory, confrontation, retreat, petition, standoff | when you want to hear *who's winning* |
+| `vocab` | musical motifs on synth pads, same vocabulary | calmer, more musical rooms |
+| `pad` / `full` | single-pad tones / genre grooves (trance, boom-bap, dnb...) | earlier experiments, kept for fun |
+
+Try them:
+
+```bash
+echo "FATAL: production is down" | python3 familiar.py play --mode duet
+echo "FATAL: production is down" | python3 familiar.py play --mode vocab
+```
+
+## Configuration
+
+All knobs are environment variables:
+
+| variable | default | meaning |
+|---|---|---|
+| `FAMILIAR_MODE` | `creature` | hook's mode: `creature` \| `duet` \| `vocab` |
+| `FAMILIAR_VOLUME` | `0.35` | playback volume, 0.0–1.0 |
+| `FAMILIAR_EMBEDDER` | `ollama` | `ollama` \| `http` \| `hashing` |
+| `FAMILIAR_OLLAMA_URL` | `http://localhost:11434/api/embeddings` | ollama endpoint |
+| `FAMILIAR_OLLAMA_MODEL` | `all-minilm` | embedding model |
+| `FAMILIAR_HTTP_URL` | — | your own embedding endpoint (`http` backend) |
+| `FAMILIAR_EMBED_TIMEOUT` | `0.6` | seconds before falling back to lexicon analysis |
+| `FAMILIAR_DIR` | `~/.claude/agent-familiar` | where hook.sh finds the install |
+
+Set them inline in the hook command to configure per-hook:
+
+```json
+{ "type": "command", "command": "FAMILIAR_MODE=duet FAMILIAR_VOLUME=0.5 ~/.claude/agent-familiar/hook.sh" }
+```
+
+## CLI reference
+
+```
+echo TEXT | python3 familiar.py COMMAND [flags]
+
+commands:
+  play      analyze, synthesize, and play
+  render    same, but write a wav (--out path.wav)
+  phrase    print the full analysis + composed events as JSON (no audio)
+
+flags:
+  --mode    vocab | creature | duet | pad | full
+  --need    force the need word: done | triumph | question | halted |
+            alert | status | departure   (default: inferred)
+  --session ID   trajectory key — drift/trend/loop detection per session
+  --text    TEXT inline instead of stdin
+```
+
+The `--session` flag is what gives the familiar memory: repeated similar states trigger the *going-in-circles* purr, sudden changes trigger movement ornaments, and improving/worsening trends add rising/falling grace notes.
 
 ## How it works
 
 1. `hook.sh` receives the hook event, tails the last ~1000 chars of the transcript
-2. `embedder.py` embeds it via ollama (~20ms warm)
+2. `embedder.py` embeds it locally (~20ms warm)
 3. `familiar.py` projects the embedding onto affect axes (valence, arousal, certainty, progress), texture directions (locality: similar moods sound similar), and the session's own trajectory (drift, trend, loops — stored in `state.json`)
-4. A call is composed — need word + inflection — and synthesized through `sox` patches (`synth.py`), mixed in pure-stdlib Python, played via `afplay`
+4. A call is composed — need word + inflection — synthesized through `sox` patches (`synth.py`), mixed in pure-stdlib Python, and played
 5. Total latency ~250-300ms, fire-and-forget
 
+```
+familiar.py       analysis + composers (vocab/creature/duet) + CLI
+synth.py          sox synthesis patches + voice cache
+embedder.py       pluggable embeddings (ollama / http / hashing)
+anchors.json      affect-axis pole exemplars (edit to retune the axes)
+build_anchors.py  bakes anchors.json -> anchors.embedded.json
+build_bank.py     optional note bank for the legacy bank engine
+hook.sh           Claude Code adapter
+install.sh        prereq checks + build + smoke test
+```
+
+Generated at runtime (gitignored): `anchors.embedded.json`, `voices/` (cached synthesized voices — safe to delete anytime), `state.json` (session trajectories), `notes/`.
+
 ## Future Ideas
+
+- **More agents** - The core is agent-agnostic (`text in, sound out`); adapters for other agent CLIs are ~20 lines each. Per-agent *species* — your Claude a songbird, your CI a crow — would make a room of agents legible by ear.
 
 - **Formant vowels** - Chain bandpass resonances to give calls vowel-like vocal tract color.
 
@@ -168,8 +196,6 @@ Inflection carries the rest: pitch wobble = the session is uncertain; body size 
 - **Duet hook** - `Stop` plays the solo creature, but big dominance swings (victory, retreat) could summon the second creature.
 
 - **Resident daemon** - A warm process would cut the ~250ms to sub-100ms and enable layered, evolving calls.
-
-- **Real instruments** - The vocab mode would sound far richer through fluidsynth + a soundfont.
 
 ## License
 
