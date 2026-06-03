@@ -4,6 +4,10 @@ A triumphant whoop means tests went green. A low growl means something broke —
 
 A hook reads the tail of the session transcript, runs it through local embeddings, and plays a short organic creature call (or musical motif) that tells you what the session needs and how it's going — without looking at the screen.
 
+## Demo
+
+https://github.com/rickgorman/agent-familiar/raw/main/agent-familiar-demo.mp4
+
 ## Requirements
 
 - macOS (uses `sox` for synthesis and `afplay` for playback)
