@@ -2,7 +2,7 @@
 # Claude Code hook: speak the session's state as a short musical utterance.
 # Reads the hook JSON on stdin, tails the transcript, plays. Fire-and-forget.
 
-MUSICBOX_DIR="$HOME/.claude/musicbox"
+FAMILIAR_DIR="$HOME/.claude/agent-familiar"
 PY=$(command -v python3 || echo /usr/bin/python3)
 
 input=$(cat)
@@ -49,6 +49,6 @@ if [ "$event" = "Notification" ]; then
 fi
 
 printf '%s' "$text" \
-  | $PY "$MUSICBOX_DIR/musicbox.py" play --mode creature --session "$session" "${need_args[@]}" \
+  | $PY "$FAMILIAR_DIR/familiar.py" play --mode creature --session "$session" "${need_args[@]}" \
   >/dev/null 2>&1 &
 exit 0

@@ -40,8 +40,8 @@ sys.path.insert(0, HERE)
 import embedder  # noqa: E402
 import synth  # noqa: E402
 
-ENGINE = os.environ.get("MUSICBOX_ENGINE", "synth")
-MODE = os.environ.get("MUSICBOX_MODE", "vocab")
+ENGINE = os.environ.get("FAMILIAR_ENGINE", "synth")
+MODE = os.environ.get("FAMILIAR_MODE", "vocab")
 PATCH_TO_BANK = {"supersaw": "pad", "glass": "pad", "acid": "string",
                  "pluck": "string", "bell": "bell"}
 
@@ -1473,7 +1473,7 @@ def write_wav(samples, path, channels=2):
         w.writeframes(samples.tobytes())
 
 
-PLAY_VOLUME = os.environ.get("MUSICBOX_VOLUME", "0.35")
+PLAY_VOLUME = os.environ.get("FAMILIAR_VOLUME", "0.35")
 
 
 def play(samples):

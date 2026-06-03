@@ -48,16 +48,16 @@ ollama pull all-minilm              # 46MB embedding model
 curl -s localhost:11434/api/tags | grep all-minilm && echo OK
 ```
 
-> If ollama isn't running, musicbox silently falls back to a cruder
+> If ollama isn't running, agent-familiar silently falls back to a cruder
 > lexicon-based analysis — it still makes sounds, they're just less smart.
 
 ### 2. Setup
 
 ```bash
 git clone https://github.com/rickgorman/agent-familiar ~/work/agent-familiar
-ln -s ~/work/agent-familiar ~/.claude/musicbox
+ln -s ~/work/agent-familiar ~/.claude/agent-familiar
 
-cd ~/.claude/musicbox
+cd ~/.claude/agent-familiar
 python3 build_anchors.py   # embeds affect axes + texture bank (~1s, needs ollama up)
 python3 build_bank.py      # optional: note bank for the legacy --engine bank fallback
 ```
@@ -66,14 +66,14 @@ python3 build_bank.py      # optional: note bank for the legacy --engine bank fa
 
 ```bash
 echo "all tests pass, shipped to production" \
-  | python3 ~/.claude/musicbox/musicbox.py play --mode creature
+  | python3 ~/.claude/agent-familiar/familiar.py play --mode creature
 ```
 
 You should hear a happy whoop-chirp within ~300ms. If you hear nothing:
 
 | symptom | fix |
 |---|---|
-| silence, no error | check output device + volume; try `MUSICBOX_VOLUME=1.0` |
+| silence, no error | check output device + volume; try `FAMILIAR_VOLUME=1.0` |
 | `sox: command not found` in stderr | `brew install sox` |
 | `phrase` output shows `"source": "bow"` | ollama not serving — `brew services start ollama` |
 | `FileNotFoundError: anchors.embedded.json` | run `python3 build_anchors.py` |
@@ -85,12 +85,12 @@ Merge into the `hooks` section of `~/.claude/settings.json` (create the file wit
 ```json
 "Notification": [
   { "matcher": "", "hooks": [
-    { "type": "command", "command": "~/.claude/musicbox/hook.sh" }
+    { "type": "command", "command": "~/.claude/agent-familiar/hook.sh" }
   ]}
 ],
 "Stop": [
   { "matcher": "", "hooks": [
-    { "type": "command", "command": "~/.claude/musicbox/hook.sh" }
+    { "type": "command", "command": "~/.claude/agent-familiar/hook.sh" }
   ]}
 ]
 ```
@@ -102,15 +102,15 @@ Merge into the `hooks` section of `~/.claude/settings.json` (create the file wit
 ### 1. Hear it
 
 ```bash
-echo "all tests pass, shipped to production" | python3 musicbox.py play --mode creature
-echo "FATAL segfault, production is down"    | python3 musicbox.py play --mode creature
-echo "should I take the locking approach or the queue approach?" | python3 musicbox.py play --mode creature
+echo "all tests pass, shipped to production" | python3 familiar.py play --mode creature
+echo "FATAL segfault, production is down"    | python3 familiar.py play --mode creature
+echo "should I take the locking approach or the queue approach?" | python3 familiar.py play --mode creature
 ```
 
 ### 2. Inspect what it heard
 
 ```bash
-echo "still failing with the same constraint violation" | python3 musicbox.py phrase --mode creature
+echo "still failing with the same constraint violation" | python3 familiar.py phrase --mode creature
 ```
 
 Returns the full analysis: need, valence, arousal, certainty, familiarity, trajectory movement, loop detection, and the composed events.
@@ -118,9 +118,9 @@ Returns the full analysis: need, valence, arousal, certainty, familiarity, traje
 ### 3. Tune
 
 ```bash
-MUSICBOX_VOLUME=0.5        # playback volume (default 0.35)
-MUSICBOX_EMBEDDER=hashing  # ollama (default) | http | hashing
-MUSICBOX_HTTP_URL=...      # your own local embedding endpoint
+FAMILIAR_VOLUME=0.5        # playback volume (default 0.35)
+FAMILIAR_EMBEDDER=hashing  # ollama (default) | http | hashing
+FAMILIAR_HTTP_URL=...      # your own local embedding endpoint
 ```
 
 ## The Vocabulary
@@ -149,7 +149,7 @@ Inflection carries the rest: pitch wobble = the session is uncertain; body size 
 
 1. `hook.sh` receives the hook event, tails the last ~1000 chars of the transcript
 2. `embedder.py` embeds it via ollama (~20ms warm)
-3. `musicbox.py` projects the embedding onto affect axes (valence, arousal, certainty, progress), texture directions (locality: similar moods sound similar), and the session's own trajectory (drift, trend, loops — stored in `state.json`)
+3. `familiar.py` projects the embedding onto affect axes (valence, arousal, certainty, progress), texture directions (locality: similar moods sound similar), and the session's own trajectory (drift, trend, loops — stored in `state.json`)
 4. A call is composed — need word + inflection — and synthesized through `sox` patches (`synth.py`), mixed in pure-stdlib Python, played via `afplay`
 5. Total latency ~250-300ms, fire-and-forget
 

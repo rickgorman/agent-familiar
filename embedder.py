@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Pluggable local text embedder. Stdlib only (urllib) so it loads instantly.
 
-Backends (MUSICBOX_EMBEDDER):
+Backends (FAMILIAR_EMBEDDER):
   ollama    (default) POST localhost:11434/api/embeddings, model all-minilm (384d).
             Ollama stays warm via keep_alive, so calls are ~20ms.
   http      POST any local embedding HTTP service that accepts
             {"text": ..., "query": true} and returns {"embeddings": [[...]]}.
-            Configure with MUSICBOX_HTTP_URL.
+            Configure with FAMILIAR_HTTP_URL.
   hashing   dependency-free MD5-bucket bag-of-words vector.
             Always available; weakest semantics.
 
@@ -18,11 +18,11 @@ import json
 import os
 import urllib.request
 
-EMBEDDER = os.environ.get("MUSICBOX_EMBEDDER", "ollama")
-OLLAMA_URL = os.environ.get("MUSICBOX_OLLAMA_URL", "http://localhost:11434/api/embeddings")
-OLLAMA_MODEL = os.environ.get("MUSICBOX_OLLAMA_MODEL", "all-minilm")
-HTTP_URL = os.environ.get("MUSICBOX_HTTP_URL", "http://localhost:3000/memory/api/v1/embed")
-TIMEOUT = float(os.environ.get("MUSICBOX_EMBED_TIMEOUT", "0.6"))
+EMBEDDER = os.environ.get("FAMILIAR_EMBEDDER", "ollama")
+OLLAMA_URL = os.environ.get("FAMILIAR_OLLAMA_URL", "http://localhost:11434/api/embeddings")
+OLLAMA_MODEL = os.environ.get("FAMILIAR_OLLAMA_MODEL", "all-minilm")
+HTTP_URL = os.environ.get("FAMILIAR_HTTP_URL", "http://localhost:3000/memory/api/v1/embed")
+TIMEOUT = float(os.environ.get("FAMILIAR_EMBED_TIMEOUT", "0.6"))
 HASH_DIM = 384
 
 
