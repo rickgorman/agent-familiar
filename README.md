@@ -6,6 +6,8 @@ A hook reads the tail of the session transcript, runs it through local embedding
 
 ## Demo
 
+🔊 **Unmute for the creature calls** — they're the whole point.
+
 https://github.com/user-attachments/assets/7fd0afa9-cff4-417f-b995-82db0f226e6e
 
 ## Requirements
