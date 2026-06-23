@@ -640,6 +640,10 @@ def seeded_rng(text):
     return random.Random(int.from_bytes(digest[:8], "big"))
 
 
+def performance_rng():
+    return random.Random()
+
+
 def diatonic_chord(scale_steps, root_midi, degree, size=3):
     n = len(scale_steps)
     notes = []
@@ -982,10 +986,70 @@ def _call_end(calls):
     return max(st + d for _, _, st, d, _ in calls)
 
 
+# Ornamentation: keep each call's pitch and span, but articulate its inside so
+# repeated calls breathe instead of holding flat. A sustained tone becomes two
+# or three shorter syllables with a breath between; a chirp can pick up a quick
+# grace blip on its attack. Driven by build_creature's performance rng, so the
+# articulation varies run to run while pitch and span (the utterance) hold.
+ORNAMENT_SUSTAINED = {"coo", "hoot", "growl"}
+ORNAMENT_SPLIT_PROB = 0.6
+ORNAMENT_SPLIT_MIN_DUR = 1.4
+ORNAMENT_TRILL_PROB = 0.35
+ORNAMENT_TRILL_MIN_DUR = 2.4
+ORNAMENT_BREATH = 0.14
+ORNAMENT_SYLLABLE_SAG = 0.06
+ORNAMENT_FLICK_PROB = 0.4
+ORNAMENT_FLICK_MIN_DUR = 0.7
+ORNAMENT_FLICK_DUR = 0.22
+ORNAMENT_FLICK_GAIN = 0.7
+ORNAMENT_FLICK_STEPS = (-3, -2, 2, 3)
+ORNAMENT_DRIFT = (-1, 0, 0, 1)
+
+
+def _split_sustained(patch, semis, start, dur, gain, rng):
+    trill = dur >= ORNAMENT_TRILL_MIN_DUR and rng.random() < ORNAMENT_TRILL_PROB
+    syllables = 3 if trill else 2
+    body = dur - ORNAMENT_BREATH * (syllables - 1)
+    weights = [rng.uniform(0.8, 1.2) for _ in range(syllables)]
+    scale = body / sum(weights)
+
+    out = []
+    cursor = start
+    for k, weight in enumerate(weights):
+        seg = weight * scale
+        drift = rng.choice(ORNAMENT_DRIFT) if k > 0 else 0
+        sag = 1.0 - ORNAMENT_SYLLABLE_SAG * k
+        out.append((patch, semis + drift, cursor, seg, gain * sag))
+        cursor += seg + ORNAMENT_BREATH
+    return out
+
+
+def _flick_chirp(patch, semis, start, dur, gain, rng):
+    grace = (patch, semis + rng.choice(ORNAMENT_FLICK_STEPS), start,
+             ORNAMENT_FLICK_DUR, gain * ORNAMENT_FLICK_GAIN)
+    main = (patch, semis, start + ORNAMENT_FLICK_DUR,
+            dur - ORNAMENT_FLICK_DUR, gain)
+    return [grace, main]
+
+
+def ornament_calls(calls, rng):
+    out = []
+    for patch, semis, start, dur, gain in calls:
+        splittable = patch in ORNAMENT_SUSTAINED and dur >= ORNAMENT_SPLIT_MIN_DUR
+        flickable = patch == "chirp" and dur >= ORNAMENT_FLICK_MIN_DUR
+        if splittable and rng.random() < ORNAMENT_SPLIT_PROB:
+            out.extend(_split_sustained(patch, semis, start, dur, gain, rng))
+        elif flickable and rng.random() < ORNAMENT_FLICK_PROB:
+            out.extend(_flick_chirp(patch, semis, start, dur, gain, rng))
+        else:
+            out.append((patch, semis, start, dur, gain))
+    return out
+
+
 def build_creature(text, need, session):
     text = text[-ANALYSIS_TAIL_CHARS:]
     rich = analyze_rich(text)
-    rng = seeded_rng(text)
+    rng = performance_rng()
     movement, trend, looping, history_sim = update_trajectory(
         session, rich["vec"], rich["valence"])
     if need is None:
@@ -1011,6 +1075,8 @@ def build_creature(text, need, session):
     elif trend < -GRACE_TREND:
         end_u = max(s + d for _, _, s, d, _ in calls)
         calls.append(("fall", -5, end_u + 0.2, 0.7, 0.5))
+
+    calls = ornament_calls(calls, rng)
 
     spread = 1.0 + 0.4 * movement
     events = []
